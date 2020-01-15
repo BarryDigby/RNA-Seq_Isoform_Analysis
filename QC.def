@@ -1,0 +1,43 @@
+Bootstrap: debootstrap
+OSversion: bionic
+MirrorURL: http://us.archive.ubuntu.com/ubuntu/ 
+
+%labels
+	RNA-Seq tutorial
+	Install FastQC, MultiQC and BBDuk.
+	This image can be used to carry out the QC part of the analysis.
+
+%environment
+	export LC_ALL=C.UTF-8
+	export LANG=C.UTF-8
+	PATH="/usr/bin/:$PATH"
+
+%post
+	apt-get update 
+	apt-get -y install \
+		build-essential \
+		wget \
+		tar \
+		sudo \
+		vim \
+		software-properties-common
+
+	sudo add-apt-repository universe
+	sudo add-apt-repository restricted
+	sudo add-apt-repository multiverse
+
+	sudo apt-get install -y \
+		fastqc \
+    		python-dev \
+    		python-pip \
+		default-jdk
+	
+	pip install multiqc
+
+	mkdir -p repo/
+	cd repo/
+	wget --no-check-certificate https://netcologne.dl.sourceforge.net/project/bbmap/BBMap_38.73.tar.gz
+	tar -xvzf BBMap_38.73.tar.gz
+	sudo chmod 777 /repo/bbmap/bbduk.sh
+	sudo ln -s /repo/bbmap/bbduk.sh /usr/bin/bbduk
+	rm BBMap_38.73.tar.gz
