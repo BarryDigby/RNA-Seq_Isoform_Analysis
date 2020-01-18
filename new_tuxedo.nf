@@ -142,7 +142,7 @@ hisat_bams1.into { hisat_bams2; hisat_bams3 }
 /*
  * STEP 5: Assemble the sorted reads into a transcriptome using GTF file as reference.
  * combine() allows you to use the gtf file for each incoming bam file. 
- * think of it as making two lists (gtf , bam) of even lenght. 
+ * think of it as making two lists (gtf , bam) of even length. 
  */
 
 process Assemble_Transcripts{
