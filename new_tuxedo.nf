@@ -1,5 +1,11 @@
 #!/usr/bin/env nextflow
 
+/*
+ * Define input parameters and parse them.
+ * fastq files are paired end, set channel using "fromFilePairs"
+ * .gtf file will be used in multiple processes, place in as many channels as necessary. 
+ */
+
 params.genome = "/data/MA5112/Practicals/RNA-Seq/Stringtie_Practical/Reference/chr22.fa"
 genome_fasta = files( params.genome )
 
@@ -12,6 +18,10 @@ params.reads = "/data/MA5112/Practicals/RNA-Seq/Stringtie_Practical/trimmed_read
 Channel
 	.fromFilePairs( params.reads )
 	.set { read_ch }
+
+/*
+ * STEP 1: Extract Exon + Splice Site locations
+ */
 
 process Extract_Splice_Sites {
 	publishDir "Reference/", mode:'copy'
@@ -30,6 +40,10 @@ process Extract_Splice_Sites {
 	"""
 }
 
+/* 
+ * STEP 2: Make Genome Index
+ */
+ 
 process Genome_Index { 
 	publishDir "Reference/", mode:'copy'
 
@@ -46,6 +60,16 @@ process Genome_Index {
 	hisat2-build -p 8 --ss ${ss} --exon ${exon} ${fasta} ${fasta.baseName}.hisat2_index
 	"""
 }	
+
+/*
+ * STEP 3: Align reads to genome, pipe to samtools
+ * collect() tells the process to use all files from channel.
+ * collect() also tells the process to use the same set of files for 
+ * each iteration of the process.
+ *
+ * to establish a bash variable, use export. wrap the command in ` `.
+ * to use the bash variable in the groovy script, escape the $ by using \$
+ */
 
 process Hisat_Alignment {
 	publishDir "BAMS/", mode:'copy'
@@ -86,6 +110,10 @@ process Hisat_Alignment {
 	"""
 }
 
+/*
+ * STEP 4: Index and sort BAM files
+ */
+
 process Sort_Index_Bams {
 	publishDir "BAMS/", mode:'copy'
 
@@ -107,7 +135,15 @@ process Sort_Index_Bams {
 	"""
 }
 
+// The command below places the sorted bam files into 2 new channels. 
+
 hisat_bams1.into { hisat_bams2; hisat_bams3 }
+
+/*
+ * STEP 5: Assemble the sorted reads into a transcriptome using GTF file as reference.
+ * combine() allows you to use the gtf file for each incoming bam file. 
+ * think of it as making two lists (gtf , bam) of even lenght. 
+ */
 
 process Assemble_Transcripts{
 	publishDir "Assembly/", mode:'copy'
@@ -128,6 +164,11 @@ process Assemble_Transcripts{
 	-p ${task.cpus} \
 	"""
 }
+
+/*
+ * STEP 6: Merge all transcripts from samples into 'consensus transcriptome'.
+ * collect() critical here to make gtf_list.txt.
+ */
 
 process Merge_Transcripts{
 	publishDir "Assembly/", mode:'copy'
@@ -151,7 +192,13 @@ process Merge_Transcripts{
 	"""
 }
 
+// we will need to use the model transcriptome twice, split over 2 channels.
+
 merged_ch.into {merged1; merged2}
+
+/*
+ * STEP 7: gffcompare to assess quality of consensus transcriptome
+ */
 
 process Assess_Model{
         publishDir "gffcompare/", mode:'copy'
@@ -172,6 +219,10 @@ process Assess_Model{
 	"""
 }
 
+/*
+ * STEP 8: Generate transcript abundance tables
+ */
+
 process Estimate_Abundance{
         publishDir "Ballgown/", mode:'copy'
 
@@ -189,5 +240,6 @@ process Estimate_Abundance{
         -o ${key}/${key}.gtf \
         ${bam} \
         -e
+	-B
         """
 }
